@@ -1,6 +1,6 @@
 import QtQuick
 import QtQuick.Layouts
-import Quickshell.Niri
+import Quickshell.Io
 import qs.Commons
 import qs.Ui
 
@@ -8,10 +8,18 @@ BarWidget {
   id: root
   moduleName: "omarchy.workspaces"
 
+  // Polled from niri so the widget tracks focus/occupancy without the
+  // (unavailable) Quickshell.Niri module.
+  property var workspaces: []
+
+  function refresh() {
+    if (queryProc.running) return
+    queryProc.running = true
+  }
+
   function workspaceById(id) {
-    var values = Niri.workspaces.values
-    for (var i = 0; i < values.length; i++) {
-      if (values[i].id === id) return values[i]
+    for (var i = 0; i < root.workspaces.length; i++) {
+      if (root.workspaces[i].id === id) return root.workspaces[i]
     }
 
     return null
@@ -19,10 +27,8 @@ BarWidget {
 
   function workspaceIds() {
     var ids = [1, 2, 3, 4, 5]
-    var values = Niri.workspaces.values
-
-    for (var i = 0; i < values.length; i++) {
-      var id = values[i].id
+    for (var i = 0; i < root.workspaces.length; i++) {
+      var id = root.workspaces[i].id
       if (id > 0 && id <= 10 && ids.indexOf(id) === -1) ids.push(id)
     }
 
@@ -33,6 +39,7 @@ BarWidget {
   function focusWorkspace(id) {
     if (!root.bar) return
     root.bar.run("niri msg action focus-workspace " + id)
+    root.refresh()
   }
 
   readonly property real trailingGap: root.vertical ? 0 : Style.spaceReal(1.5)
@@ -55,8 +62,8 @@ BarWidget {
         required property int modelData
 
         readonly property var workspace: root.workspaceById(modelData)
-        readonly property bool occupied: workspace !== null && workspace.toplevels.values.length > 0
-        readonly property bool focused: Hyprland.focusedWorkspace !== null && Hyprland.focusedWorkspace.id === modelData
+        readonly property bool occupied: workspace !== null && workspace.active_window_id !== null
+        readonly property bool focused: workspace !== null && workspace.is_focused === true
 
         bar: root.bar
         text: focused ? "\uDB85\uDCFB" : (modelData === 10 ? "0" : String(modelData))
@@ -69,4 +76,28 @@ BarWidget {
       }
     }
   }
+
+  Process {
+    id: queryProc
+    command: ["niri", "msg", "--json", "workspaces"]
+    stdout: StdioCollector {
+      waitForEnd: true
+      onStreamFinished: {
+        try {
+          root.workspaces = JSON.parse(text || "[]")
+        } catch (e) {
+          root.workspaces = []
+        }
+      }
+    }
+  }
+
+  Timer {
+    interval: 500
+    repeat: true
+    running: true
+    onTriggered: root.refresh()
+  }
+
+  Component.onCompleted: root.refresh()
 }

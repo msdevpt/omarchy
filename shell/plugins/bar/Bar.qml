@@ -1,5 +1,4 @@
 import Quickshell
-import Quickshell.Niri
 import Quickshell.Io
 import Quickshell.Wayland
 import QtQuick
@@ -487,9 +486,39 @@ Item {
   // The output Hyprland has focused, which is where a keyboard-summoned panel
   // belongs. Empty until Hyprland reports one, which leaves panel routing on
   // its per-monitor fallback rather than guessing at an output.
+  // The output niri has focused, which is where a keyboard-summoned panel
+  // belongs. Empty until niri reports one, which leaves panel routing on
+  // its per-monitor fallback rather than guessing at an output.
+  property string focusedOutputName: ""
+
   function focusedScreenName() {
-    var monitor = Hyprland.focusedMonitor
-    return monitor ? String(monitor.name || "") : ""
+    return root.focusedOutputName
+  }
+
+  Process {
+    id: focusedOutputProc
+    running: true
+    command: ["niri", "msg", "--json", "focused-output"]
+    stdout: StdioCollector {
+      waitForEnd: true
+      onStreamFinished: {
+        try {
+          var out = JSON.parse(text || "{}")
+          root.focusedOutputName = out && out.name ? String(out.name) : ""
+        } catch (e) {
+          root.focusedOutputName = ""
+        }
+      }
+    }
+  }
+
+  Timer {
+    interval: 1000
+    repeat: true
+    running: true
+    onTriggered: {
+      if (!focusedOutputProc.running) focusedOutputProc.running = true
+    }
   }
 
   // Resolve the live bar-widget instance for a plugin id (e.g. "omarchy.bluetooth").

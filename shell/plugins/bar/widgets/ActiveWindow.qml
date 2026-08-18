@@ -1,6 +1,6 @@
 import QtQuick
 import Quickshell
-import Quickshell.Niri
+import Quickshell.Io
 import qs.Commons
 import qs.Ui
 
@@ -8,10 +8,17 @@ BarWidget {
   id: root
   moduleName: "omarchy.active-window"
 
-
-  readonly property var focusedWindow: Niri.focusedWindow
-  readonly property string title: focusedWindow ? (focusedWindow.title || focusedWindow.appId || "") : ""
+  // Polled from niri; `focusedWindow` is the raw JSON object (or null).
+  property var focusedWindow: null
+  readonly property string title: focusedWindow
+    ? (focusedWindow.title || focusedWindow.app_id || "")
+    : ""
   readonly property int maxLabelWidth: Number(setting("maxWidth", 280))
+
+  function refresh() {
+    if (queryProc.running) return
+    queryProc.running = true
+  }
 
   visible: title !== "" && !vertical
   implicitWidth: visible ? Math.min(maxLabelWidth, labelText.implicitWidth) + Style.spacing.controlPaddingX * 2 : 0
@@ -48,16 +55,42 @@ BarWidget {
     cursorShape: Qt.PointingHandCursor
 
     onClicked: function(mouse) {
-      if (!root.focusedWindow) return
+      if (!root.focusedWindow || root.focusedWindow.id === undefined || !root.bar) return
+      var id = root.focusedWindow.id
       if (mouse.button === Qt.MiddleButton) {
-        root.focusedWindow.close()
+        root.bar.run("niri msg action close-window " + id)
       } else if (mouse.button === Qt.RightButton) {
-        root.focusedWindow.close()
+        root.bar.run("niri msg action close-window " + id)
       } else {
-        root.focusedWindow.focus()
+        root.bar.run("niri msg action focus-window " + id)
       }
     }
     onEntered: if (root.bar) root.bar.showTooltip(root, root.title)
     onExited: if (root.bar) root.bar.hideTooltip(root)
   }
+
+  Process {
+    id: queryProc
+    command: ["niri", "msg", "--json", "focused-window"]
+    stdout: StdioCollector {
+      waitForEnd: true
+      onStreamFinished: {
+        try {
+          var win = JSON.parse(text || "null")
+          root.focusedWindow = (win && typeof win === "object" && win.id !== undefined) ? win : null
+        } catch (e) {
+          root.focusedWindow = null
+        }
+      }
+    }
+  }
+
+  Timer {
+    interval: 500
+    repeat: true
+    running: true
+    onTriggered: root.refresh()
+  }
+
+  Component.onCompleted: root.refresh()
 }

@@ -1,6 +1,5 @@
 import QtQuick
 import Quickshell
-import Quickshell.Niri
 import Quickshell.Io
 import qs.Ui
 import qs.Commons
@@ -82,24 +81,6 @@ BarWidget {
     refresh()
   }
 
-  Connections {
-    target: Niri
-    function onRawEvent(event) {
-      if (!event || !event.name) return
-      var name = String(event.name)
-      // The event names the keyboard that switched ahead of the layout it moved
-      // to, and that is the keyboard being typed on whatever holds the main flag.
-      if (name === "activelayout") {
-        const named = KeyboardLayoutModel.eventKeyboardName(event)
-        if (named) root.typedKeyboardName = named
-      }
-
-      // A reload that adds a layout to kb_layout decides whether the widget
-      // shows at all, and leaves every keyboard on the layout it was already
-      // reading, so it raises no activelayout to notice it by.
-      if (name.indexOf("activelayout") !== -1 || name === "configreloaded") root.refresh()
-    }
-  }
 
   Process {
     id: queryProc
