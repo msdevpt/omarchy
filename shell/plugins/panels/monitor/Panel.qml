@@ -300,12 +300,13 @@ Panel {
     if (!name) return
     if (enabled && root.enabledDisplayCount <= 1) return
 
-    actionProc.command = ["hyprctl", "keyword", "monitor", name + (enabled ? ",disable" : ",preferred,auto,auto")]
+    actionProc.command = ["niri", "msg", "output", name, enabled ? "off" : "on"]
     if (!actionProc.running) actionProc.running = true
   }
 
   function setScale(scale) {
-    actionProc.command = ["bash", "-c", "omarchy-hyprland-monitor-scaling " + scale]
+    if (!root.focusedMonitor) return
+    actionProc.command = ["niri", "msg", "output", root.focusedMonitor, "scale", String(scale)]
     if (!actionProc.running) actionProc.running = true
   }
 

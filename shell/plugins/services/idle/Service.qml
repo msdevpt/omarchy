@@ -1,6 +1,5 @@
 import QtQuick
 import Quickshell
-import Quickshell.Hyprland
 import Quickshell.Io
 import Quickshell.Wayland
 import "IdleModel.js" as IdleModel
@@ -138,21 +137,6 @@ Item {
     root.cancelIdleCycle("screensaver-dismissed")
   }
 
-  function eventParts(event, count) {
-    return IdleModel.eventParts(event, count)
-  }
-
-  function handleHyprlandEvent(event) {
-    var name = String(event && event.name ? event.name : "")
-    if (name === "openwindow") {
-      var open = eventParts(event, 4)
-      if (String(open[2] || "") === root.screensaverClass) root.handleScreensaverWindowOpened(open[0])
-    } else if (name === "closewindow") {
-      var close = eventParts(event, 1)
-      var address = String(close[0] || "")
-      if (root.screensaverWindows[address]) root.handleScreensaverWindowClosed(address)
-    }
-  }
 
   function handleActiveSignal() {
     if (!root.idledThisCycle) return
@@ -175,6 +159,31 @@ Item {
 
     if (idleMonitor.isIdle) startIdleCycle()
     else handleActiveSignal()
+  }
+  // niri has no Hyprland-style raw event stream we can parse cheaply, and the
+  // screensaver only lives for a moment, so poll the window list and diff the
+  // screensaver window's presence. The actual idle/lock decision is still
+  // driven by Quickshell's compositor-agnostic IdleMonitor below.
+  property var lastScreensaverIds: ({})
+
+  function syncScreensaverWindows(windowsJson) {
+    var list = []
+    try { list = JSON.parse(windowsJson || "[]") } catch (e) { list = [] }
+    if (!Array.isArray(list)) list = []
+
+    var present = {}
+    for (var i = 0; i < list.length; i++) {
+      if (String(list[i].app_id) === root.screensaverClass) present[String(list[i].id)] = true
+    }
+
+    for (var id in present) {
+      if (!root.lastScreensaverIds[id]) root.handleScreensaverWindowOpened(id)
+    }
+    for (var id2 in root.lastScreensaverIds) {
+      if (!present[id2]) root.handleScreensaverWindowClosed(id2)
+    }
+
+    root.lastScreensaverIds = present
   }
 
   function statusJson() {
@@ -280,10 +289,6 @@ Item {
     }
   }
 
-  Connections {
-    target: Hyprland
-    function onRawEvent(event) { root.handleHyprlandEvent(event) }
-  }
 
   Process {
     id: screensaverProcess
@@ -296,6 +301,23 @@ Item {
   Process {
     id: wakeProcess
     onExited: function(exitCode, exitStatus) { root.logEvent("process-exit", "wake exitCode=" + exitCode + " status=" + exitStatus) }
+  }
+  Process {
+    id: windowsProc
+    command: ["niri", "msg", "--json", "windows"]
+    stdout: StdioCollector {
+      waitForEnd: true
+      onStreamFinished: root.syncScreensaverWindows(text)
+    }
+  }
+
+  Timer {
+    interval: 1000
+    repeat: true
+    running: true
+    onTriggered: {
+      if (!windowsProc.running) windowsProc.running = true
+    }
   }
 
   Process {

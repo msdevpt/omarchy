@@ -3,21 +3,27 @@
 # omarchy:summary=Print monitor panel state for the shell
 # omarchy:group=monitor
 
-monitors_json=$(hyprctl monitors all -j)
-focused_monitor=$(printf '%s\n' "$monitors_json" | jq -r '[.[] | select(.focused == true)][0].name // ""')
+outputs_json=$(niri msg --json outputs 2>/dev/null)
+focused=$(niri msg --json focused-output 2>/dev/null | jq -r '.name // ""')
 
-{ omarchy-brightness-display --monitor "$focused_monitor" 2>/dev/null; echo; } | head -n 1
+# brightness availability (compositor-agnostic backlight CLI)
+{ omarchy-brightness-display --monitor "$focused" 2>/dev/null; echo; } | head -n 1
 
-printf '%s\n' "$monitors_json" | jq -r '
-  def internal: test("^(eDP|LVDS|DSI)-");
-  ([.[] | select(.name | internal)][0].name // ""),
-  ([.[] | select((.name | internal) | not)][0].name // ""),
-  ([.[] | select((.name | internal) and .disabled != true)][0].name // ""),
-  ([.[] | select(.mirrorOf != "none") | if (.name | internal) then .mirrorOf else .name end][0] // "")
-'
+# internal / external detection (niri exposes no mirror concept)
+internal=$(printf '%s\n' "$outputs_json" | jq -r '[(if type=="array" then .[] else (.|to_entries|.[].value) end) | select(.name | test("^(eDP|LVDS|DSI)-"))][0].name // ""')
+external=$(printf '%s\n' "$outputs_json" | jq -r '[(if type=="array" then .[] else (.|to_entries|.[].value) end) | select((.name | test("^(eDP|LVDS|DSI)-")) | not)][0].name // ""')
+internal_enabled=$(printf '%s\n' "$outputs_json" | jq -r --arg internal "$internal" '[(if type=="array" then .[] else (.|to_entries|.[].value) end) | select(.name==$internal)][0].name // ""')
+mirror=""
 
-printf '%s\n' "$focused_monitor"
-omarchy-hyprland-monitor-scaling 2>/dev/null || echo
+printf '%s\n' "$internal"
+printf '%s\n' "$external"
+printf '%s\n' "$internal_enabled"
+printf '%s\n' "$mirror"
 
-printf '%s\n' "$monitors_json" | jq -c \
-  '[.[] | {name, enabled:(.disabled != true), focused:(.focused == true), width, height}]'
+printf '%s\n' "$focused"
+
+# focused output scale (current_mode is an index into modes; logical carries scale)
+printf '%s\n' "$outputs_json" | jq -r --arg focused "$focused" '[(if type=="array" then .[] else (.|to_entries|.[].value) end) | select(.name==$focused)][0].logical.scale // ""'
+
+# displays JSON
+printf '%s\n' "$outputs_json" | jq -c --arg focused "$focused" '[(if type=="array" then .[] else (.|to_entries|.[].value) end) | {name, enabled:true, focused:(.name==$focused), width:(.logical.width // 0), height:(.logical.height // 0)}]'

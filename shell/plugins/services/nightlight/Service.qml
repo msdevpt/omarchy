@@ -46,15 +46,21 @@ Item {
   }
 
   function runApply(temp) {
-    applyProcess.command = ["bash", "-lc",
-      "pgrep -x hyprsunset >/dev/null || { setsid uwsm-app -- hyprsunset >/dev/null 2>&1 & sleep 1; }; " +
-      "hyprctl hyprsunset temperature " + Number(temp)]
+    var t = Number(temp)
+    if (t >= 6000) {
+      // Neutral / off: stopping gammastep restores the default gamma ramp.
+      applyProcess.command = ["bash", "-lc", "pkill -x gammastep 2>/dev/null; true"]
+    } else {
+      applyProcess.command = ["bash", "-lc",
+        "pkill -x gammastep 2>/dev/null; sleep 0.3; " +
+        "pgrep -x gammastep >/dev/null || { setsid gammastep -O " + t + " >/dev/null 2>&1 & sleep 1; }"]
+    }
     applyProcess.running = true
   }
 
   Process {
     id: statusProbe
-    command: ["hyprctl", "hyprsunset", "temperature"]
+    command: ["bash", "-lc", "pgrep -x gammastep -a | grep -oE '[0-9]{3,5}' | head -1"]
     stdout: StdioCollector {
       waitForEnd: true
       onStreamFinished: {
