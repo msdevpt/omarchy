@@ -1,5 +1,5 @@
 import Quickshell
-import Quickshell.Hyprland
+import Quickshell.Niri
 import Quickshell.Io
 import Quickshell.Wayland
 import QtQuick

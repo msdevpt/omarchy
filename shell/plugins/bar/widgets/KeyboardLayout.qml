@@ -1,6 +1,6 @@
 import QtQuick
 import Quickshell
-import Quickshell.Hyprland
+import Quickshell.Niri
 import Quickshell.Io
 import qs.Ui
 import qs.Commons
@@ -73,7 +73,7 @@ BarWidget {
   // follows the button.
   function cycleLayout() {
     if (!root.keyboardName || !root.bar) return
-    root.bar.run("hyprctl switchxkblayout " + Util.shellQuote(root.keyboardName) + " next")
+    root.bar.run("niri msg action set-keyboard-layout " + root.keyboardName + " next")
     refreshTimer.restart()
   }
 
@@ -83,7 +83,7 @@ BarWidget {
   }
 
   Connections {
-    target: Hyprland
+    target: Niri
     function onRawEvent(event) {
       if (!event || !event.name) return
       var name = String(event.name)
@@ -103,7 +103,7 @@ BarWidget {
 
   Process {
     id: queryProc
-    command: ["hyprctl", "-j", "devices"]
+    command: ["niri", "msg", "--json", "keyboards"]
     onRunningChanged: {
       if (running) {
         stallTimer.restart()

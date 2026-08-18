@@ -1,6 +1,6 @@
 import QtQuick
 import Quickshell
-import Quickshell.Wayland
+import Quickshell.Niri
 import qs.Commons
 import qs.Ui
 
@@ -9,8 +9,8 @@ BarWidget {
   moduleName: "omarchy.active-window"
 
 
-  readonly property var toplevel: ToplevelManager.activeToplevel
-  readonly property string title: toplevel ? (toplevel.title || toplevel.appId || "") : ""
+  readonly property var focusedWindow: Niri.focusedWindow
+  readonly property string title: focusedWindow ? (focusedWindow.title || focusedWindow.appId || "") : ""
   readonly property int maxLabelWidth: Number(setting("maxWidth", 280))
 
   visible: title !== "" && !vertical
@@ -48,13 +48,13 @@ BarWidget {
     cursorShape: Qt.PointingHandCursor
 
     onClicked: function(mouse) {
-      if (!root.toplevel) return
+      if (!root.focusedWindow) return
       if (mouse.button === Qt.MiddleButton) {
-        root.toplevel.close()
+        root.focusedWindow.close()
       } else if (mouse.button === Qt.RightButton) {
-        root.toplevel.close()
+        root.focusedWindow.close()
       } else {
-        root.toplevel.activate()
+        root.focusedWindow.focus()
       }
     }
     onEntered: if (root.bar) root.bar.showTooltip(root, root.title)

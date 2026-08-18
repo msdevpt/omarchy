@@ -1,6 +1,6 @@
 import QtQuick
 import QtQuick.Layouts
-import Quickshell.Hyprland
+import Quickshell.Niri
 import qs.Commons
 import qs.Ui
 
@@ -9,7 +9,7 @@ BarWidget {
   moduleName: "omarchy.workspaces"
 
   function workspaceById(id) {
-    var values = Hyprland.workspaces.values
+    var values = Niri.workspaces.values
     for (var i = 0; i < values.length; i++) {
       if (values[i].id === id) return values[i]
     }
@@ -19,7 +19,7 @@ BarWidget {
 
   function workspaceIds() {
     var ids = [1, 2, 3, 4, 5]
-    var values = Hyprland.workspaces.values
+    var values = Niri.workspaces.values
 
     for (var i = 0; i < values.length; i++) {
       var id = values[i].id
@@ -32,7 +32,7 @@ BarWidget {
 
   function focusWorkspace(id) {
     if (!root.bar) return
-    root.bar.run("hyprctl dispatch " + Util.shellQuote("hl.dsp.focus({ workspace = \"" + id + "\" })"))
+    root.bar.run("niri msg action focus-workspace " + id)
   }
 
   readonly property real trailingGap: root.vertical ? 0 : Style.spaceReal(1.5)
